@@ -2,6 +2,8 @@ package com.ericliu.codis;
 
 import io.codis.jodis.JedisResourcePool;
 import io.codis.jodis.RoundRobinJedisPool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.dao.DataAccessException;
@@ -21,6 +23,8 @@ import java.io.IOException;
  */
 public class CoidsConnectionFactory implements InitializingBean, DisposableBean, RedisConnectionFactory {
 
+    Logger logger = LoggerFactory.getLogger(CoidsConnectionFactory.class);
+
     private String zkServer;
     private Integer timeout = 30000;
     private String zkProxyDir;
@@ -32,24 +36,27 @@ public class CoidsConnectionFactory implements InitializingBean, DisposableBean,
 
     @Override
     public RedisConnection getConnection() {
-        Jedis jedis = jedisResourcePool.getResource();
-        JedisConnection connection = new JedisConnection(jedis);
-        connection.setConvertPipelineAndTxResults(convertPipelineAndTxResults);
+        JedisConnection connection;
+        Jedis jedis = null;
+        jedis = jedisResourcePool.getResource();
+        connection = new CodisConnection(jedis);
         return connection;
     }
 
     public int getDatabase() {
-        return 0;
+        return database;
     }
 
     @Override
     public RedisClusterConnection getClusterConnection() {
+        logger.warn("CoidsConnectionFactory not suppourt getClusterConnection");
         return null;
     }
 
     @Override
     public boolean getConvertPipelineAndTxResults() {
-        return false;
+        logger.warn("CoidsConnectionFactory not suppourt getConvertPipelineAndTxResults default true");
+        return true;
     }
 
     public void setConvertPipelineAndTxResults(boolean convertPipelineAndTxResults) {
@@ -58,12 +65,13 @@ public class CoidsConnectionFactory implements InitializingBean, DisposableBean,
 
     @Override
     public RedisSentinelConnection getSentinelConnection() {
+        logger.warn("CoidsConnectionFactory not suppourt getSentinelConnection");
         return null;
     }
 
-    //    @Nullable
     @Override
     public DataAccessException translateExceptionIfPossible(RuntimeException e) {
+        logger.warn("CoidsConnectionFactory not suppourt translateExceptionIfPossible");
         return null;
     }
 
@@ -80,8 +88,12 @@ public class CoidsConnectionFactory implements InitializingBean, DisposableBean,
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        jedisResourcePool = RoundRobinJedisPool.create().curatorClient(zkServer, timeout)
-                .zkProxyDir(zkProxyDir).database(database).password(password).build();
+        jedisResourcePool = RoundRobinJedisPool.create()
+                .curatorClient(zkServer, timeout)
+                .zkProxyDir(zkProxyDir)
+                .database(database)
+                .password(password)
+                .build();
     }
 
     public void setZkServer(String zkServer) {
